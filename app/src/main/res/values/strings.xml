@@ -4,6 +4,7 @@
     <string name="gps_status">GPS Status</string>
     <string name="get_weather">Get Weather</string>
     <string name="pinpoint_failure">Unable to pinpoint location, please retry.</string>
+    <string name="retry_failure">Still don\'t have a location, wtf rumeinia?!.</string>
     <string name="please_enable_gps">Please enable location service.</string>
     <string name="gps_enabled">Location service is enabled.</string>
 </resources>
