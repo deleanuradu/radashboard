@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import android.os.Bundle
+import android.os.Looper
 import android.util.Log
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -28,55 +29,93 @@ class MainActivity : AppCompatActivity() {
     private lateinit var resultsTextView: TextView
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private var latestLocation: Location? = null
+    private var requestingLocationUpdates: Boolean = false
+    private var gpsEnabled: Boolean = false
 
     companion object {
         const val REQUEST_CHECK_SETTINGS = 999
     }
 
     private val locationRequest: LocationRequest = LocationRequest.create().apply {
-        interval = 10000
-        fastestInterval = 5000
-        priority = LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
+        interval = 5000
+        fastestInterval = 1000
+        priority = LocationRequest.PRIORITY_HIGH_ACCURACY
     }
+
+    private lateinit var locationCallback: LocationCallback
 
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         resultsTextView = findViewById(R.id.resultsTextView)
-
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult?) {
+                locationResult ?: return
+                obtainLocation()
+                if (latestLocation != null) {
+                    loadMeteoInfo()
+                    requestingLocationUpdates = false
+                    stopLocationUpdates()
+                }
+            }
+        }
 
-        obtainLocation()
+        checkGPSStatus()
+        if (gpsEnabled) {
+            startLocationUpdates()
+        }
 
         getWeatherButton.setOnClickListener {
-            // if no location, try to get one
             if (latestLocation == null) {
-                resultsTextView.text = getString(R.string.pinpoint_failure)
                 obtainLocation()
             }
-            // if now you got location, get meto info
             if (latestLocation != null) {
-                weatherBitURL =
-                    "https://api.weatherbit.io/v2.0/current?" + "lat=" + latestLocation!!.latitude +
-                            "&lon=" + latestLocation!!.longitude + "&key=" + weatherBitAPIKey
+                if (requestingLocationUpdates) {
+                    requestingLocationUpdates = false
+                    stopLocationUpdates()
+                }
                 loadMeteoInfo()
-            }
-            // if you still don't have a location
-            else {
-                resultsTextView.text = getString(R.string.retry_failure)
+            } else {
+                resultsTextView.text = getString(R.string.pinpoint_failure)
+                requestingLocationUpdates = true
+                startLocationUpdates()
             }
         }
     }
 
+    private fun startLocationUpdates() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            val permissions = arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+            ActivityCompat.requestPermissions(this, permissions, 0)
+        } else {
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.getMainLooper()
+            )
+        }
+    }
+
+    private fun stopLocationUpdates() {
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+    }
+
     private fun obtainLocation() {
-        val builder: LocationSettingsRequest.Builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+        val builder: LocationSettingsRequest.Builder =
+            LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
         val client: SettingsClient = LocationServices.getSettingsClient(this)
         val task: Task<LocationSettingsResponse> = client.checkLocationSettings(builder.build())
 
-        // GPS is on
         task.addOnSuccessListener {
-            // if any permissions missing, request them
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED &&
                 ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -87,28 +126,34 @@ class MainActivity : AppCompatActivity() {
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 )
                 ActivityCompat.requestPermissions(this, permissions, 0)
-            }
-            // else load latest location
-            else {
+            } else {
                 fusedLocationClient.lastLocation
                     .addOnSuccessListener { location: Location? ->
                         latestLocation = location
                     }
-                Log.e("Latest location: ", latestLocation.toString())
             }
         }
-        // if GPS is off ask user to enable it
         task.addOnFailureListener { exception ->
             if (exception is ResolvableApiException) {
                 try {
                     exception.startResolutionForResult(this@MainActivity, REQUEST_CHECK_SETTINGS)
-                } catch (sendEx: IntentSender.SendIntentException) { }
+                } catch (sendEx: IntentSender.SendIntentException) {
+                }
             }
         }
     }
 
+    private fun checkGPSStatus() {
+        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        gpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+    }
+
     @SuppressLint("SetTextI18n")
     private fun loadMeteoInfo() {
+        weatherBitURL =
+            "https://api.weatherbit.io/v2.0/current?" + "lat=" + latestLocation!!.latitude +
+                    "&lon=" + latestLocation!!.longitude + "&key=" + weatherBitAPIKey
+
         // Instantiate the RequestQueue.
         val queue = Volley.newRequestQueue(this)
 
