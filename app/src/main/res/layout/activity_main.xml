@@ -67,7 +67,7 @@
         android:layout_marginRight="40dp"
         android:layout_marginBottom="420dp"
         android:fontFamily="sans-serif-black"
-        android:text="@string/gps_status"
+        android:text="@string/welcome"
         android:textColor="#F6F8F5"
         android:textSize="20sp"
         android:textStyle="bold" />
