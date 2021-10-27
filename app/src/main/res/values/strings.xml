@@ -1,9 +1,9 @@
 <resources>
     <string name="app_name">RaDashboard</string>
-    <string name="meteo_info">Meteo info</string>
-    <string name="gps_status">GPS Status</string>
+    <string name="meteo_info">Weather info will be displayed here after location is acquired.</string>
+    <string name="welcome">Welcome!</string>
     <string name="get_weather">Get Weather</string>
-    <string name="pinpoint_failure">Unable to pinpoint location, please retry.</string>
+    <string name="pinpoint_failure">Attempting to pinpoint location, please wait… If location services are disabled please enable them and try again.</string>
     <string name="please_enable_gps">Please enable location service.</string>
     <string name="gps_enabled">Location service is enabled.</string>
 </resources>
